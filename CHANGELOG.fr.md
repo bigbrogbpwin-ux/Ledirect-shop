@@ -16,7 +16,7 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Les ver
 - WhatsApp part quand `BSP_TOKEN` et `BSP_URL` sont tous deux définis. Le SMS envoie le code de retrait et les exceptions de paiement quand `SMS_TOKEN` et `SMS_URL` sont tous deux définis.
 - `POST /api/cron/daily` avec `Authorization: Bearer <CRON_SECRET>` fait la sauvegarde, envoie les remboursements et messages en file, et relève les crédits Monime si les clés existent.
 - Une ligne achetée exige le dossier d'achat. L'arrivée à l'entrepôt d'origine exige la photo de pesée. Le poids en grammes peut être noté à cette étape.
-- Note de cette itération, en chinois, anglais et français : [docs/iteration-2026-10-24.html](docs/iteration-2026-10-24.html).
+- Note v0.2.0, en chinois, anglais et français : [docs/v0.2.0.html](docs/v0.2.0.html). La v0.1.0 reste [docs/index.html](docs/index.html).
 
 ### Corrigé
 

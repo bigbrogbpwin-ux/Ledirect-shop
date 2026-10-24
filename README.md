@@ -146,8 +146,8 @@ Note d'avancement en chinois, anglais et français : ouvrir [docs/index.html](do
 The chapters above are the first public text. Later iterations are recorded beside them and do not replace them.
 
 - [Changelog](CHANGELOG.md) · [中文](CHANGELOG.zh-CN.md) · [Français](CHANGELOG.fr.md)
-- [0.2.0 iteration note](docs/iteration-2026-10-24.html), in Chinese, English, and French
-- First completion note: [docs/index.html](docs/index.html)
+- v0.1.0: [docs/index.html](docs/index.html)
+- v0.2.0: [docs/v0.2.0.html](docs/v0.2.0.html), in Chinese, English, and French
 
 ## License
 

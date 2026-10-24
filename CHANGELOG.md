@@ -16,7 +16,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/). Versions fol
 - WhatsApp sends when `BSP_TOKEN` and `BSP_URL` are both set. SMS sends pickup codes and payment exceptions when `SMS_TOKEN` and `SMS_URL` are both set.
 - `POST /api/cron/daily` with `Authorization: Bearer <CRON_SECRET>` runs the backup, sends queued refunds and messages, and pulls Monime credits when those keys exist.
 - A bought line now requires the purchase record. Arrival at the origin warehouse requires the weighing photo. Grams can be stored on that step.
-- Iteration note, in Chinese, English, and French: [docs/iteration-2026-10-24.html](docs/iteration-2026-10-24.html).
+- v0.2.0 note, in Chinese, English, and French: [docs/v0.2.0.html](docs/v0.2.0.html). v0.1.0 remains [docs/index.html](docs/index.html).
 
 ### Fixed
 

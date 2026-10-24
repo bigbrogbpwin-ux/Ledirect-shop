@@ -140,8 +140,8 @@ npm run backup
 上面的章节是第一次公开的原文。后来的迭代写在旁边，不替换这些章节。
 
 - [更新日志](CHANGELOG.zh-CN.md) · [English](CHANGELOG.md) · [Français](CHANGELOG.fr.md)
-- [0.2.0 迭代说明](docs/iteration-2026-10-24.html)，中文、英文、法文
-- 第一份完成度说明：[docs/index.html](docs/index.html)
+- v0.1.0：[docs/index.html](docs/index.html)
+- v0.2.0：[docs/v0.2.0.html](docs/v0.2.0.html)，中文、英文、法文
 
 ## 许可证
 

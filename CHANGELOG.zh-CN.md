@@ -16,7 +16,7 @@
 - `BSP_TOKEN` 和 `BSP_URL` 都在时发送 WhatsApp。`SMS_TOKEN` 和 `SMS_URL` 都在时，短信只发提货码和支付异常。
 - `POST /api/cron/daily`，请求头 `Authorization: Bearer <CRON_SECRET>`。它做备份、发出排队的退款和消息，并在密钥已配置时拉取 Monime 入账。
 - 标成已采购必须写下采购记录。入货源仓必须有称重照片。这一步可以记下克重。
-- 本迭代的中文、英文、法文说明：[docs/iteration-2026-10-24.html](docs/iteration-2026-10-24.html)。
+- v0.2.0 说明（中文、英文、法文）：[docs/v0.2.0.html](docs/v0.2.0.html)。v0.1.0 仍是 [docs/index.html](docs/index.html)。
 
 ### 修复
 

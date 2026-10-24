@@ -140,8 +140,8 @@ npm run backup
 Les chapitres ci-dessus sont le premier texte public. Les itérations suivantes sont notées à côté et ne les remplacent pas.
 
 - [Journal](CHANGELOG.fr.md) · [English](CHANGELOG.md) · [中文](CHANGELOG.zh-CN.md)
-- [Note d'itération 0.2.0](docs/iteration-2026-10-24.html), en chinois, anglais et français
-- Première note d'avancement : [docs/index.html](docs/index.html)
+- v0.1.0 : [docs/index.html](docs/index.html)
+- v0.2.0 : [docs/v0.2.0.html](docs/v0.2.0.html), en chinois, anglais et français
 
 ## Licence
 

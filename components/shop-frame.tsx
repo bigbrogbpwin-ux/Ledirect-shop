@@ -4,6 +4,7 @@ import { DemoDock, PwaRegister } from "@/components/dock";
 import { LangSwitch } from "@/components/lang-switch";
 import { BRAND } from "@/lib/brand";
 import { t, type Lang } from "@/lib/i18n";
+import { version } from "@/package.json";
 
 export function ShopFrame({
   lang,
@@ -66,7 +67,7 @@ export function ShopFrame({
               </button>
             </form>
           ) : null}
-          <p className="w-full text-xs text-ink/60">{t(lang, "footer_note")}</p>
+          <p className="w-full text-xs text-ink/60">{t(lang, "footer_note")} · v{version}</p>
         </div>
       </footer>
       <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-white md:hidden">

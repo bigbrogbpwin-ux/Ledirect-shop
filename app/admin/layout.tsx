@@ -3,6 +3,7 @@ import { staffOutAction } from "@/app/actions";
 import { LangSwitch } from "@/components/lang-switch";
 import { currentStaff, getLang } from "@/lib/auth";
 import { t } from "@/lib/i18n";
+import { version } from "@/package.json";
 
 const LINKS = ["", "products", "quotes", "orders", "warehouse", "finance", "tickets", "reports", "content", "coupons", "settings", "audit", "sellers", "integrations", "people"];
 const KEYS = ["desk", "products", "quotes", "nav_orders", "warehouse", "finance", "tickets", "reports", "content", "coupons", "settings", "audit", "sellers", "integrations", "users"];
@@ -21,6 +22,7 @@ async function Shell({ children }: { children: React.ReactNode }) {
       <header className="bg-sea text-white">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
           <Link href="/admin" className="font-semibold">LeDirect desk</Link>
+          <span className="text-sm text-white/70">v{version}</span>
           <div className="ml-auto flex items-center gap-3 text-sm">
             {staff ? <span>{staff.name} · {staff.role}</span> : null}
             <LangSwitch lang={lang} />
