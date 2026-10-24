@@ -9,6 +9,6 @@ export async function GET() {
     ok: products > 0,
     service: "ledirect",
     products,
-    backup: backup ? path.basename(backup) : null,
+    backup: Boolean(backup),
   });
 }

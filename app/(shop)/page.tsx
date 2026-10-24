@@ -6,6 +6,7 @@ import { containerProgress, type ProductRow } from "@/lib/commerce";
 import { many, one } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
 import { pick, t } from "@/lib/i18n";
+import { safeAsset } from "@/lib/safe";
 
 export default async function HomePage() {
   const lang = await getLang();
@@ -79,7 +80,7 @@ export default async function HomePage() {
       <section className="grid gap-3 md:grid-cols-3">
         {unbox.map((post) => (
           <Link key={post.id} href="/help" className="border border-line bg-white">
-            <div className="aspect-[4/3] bg-mist" style={{ backgroundImage: `url(${post.image})`, backgroundSize: "cover" }} />
+            <div className="aspect-[4/3] bg-mist" style={safeAsset(post.image) ? { backgroundImage: `url(${safeAsset(post.image)})`, backgroundSize: "cover" } : undefined} />
             <p className="p-3 text-sm">{pick(lang, post, "title")}</p>
           </Link>
         ))}

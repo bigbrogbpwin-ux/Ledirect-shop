@@ -1,4 +1,4 @@
-import { approveRefundAction, fxActivateAction, fxProposeAction, reconAction, replayAction, supplementAction } from "@/app/actions";
+import { approveRefundAction, fxActivateAction, fxProposeAction, pullSettlementAction, reconAction, replayAction, supplementAction } from "@/app/actions";
 import { ErrorNote } from "@/components/card";
 import { requireStaffRole, getLang } from "@/lib/auth";
 import { many } from "@/lib/db";
@@ -60,11 +60,14 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
       </section>
       <section>
         <h2 className="text-xl font-semibold">Monime</h2>
+        <form action={pullSettlementAction} className="mt-2">
+          <button className="min-h-11 border border-line bg-white px-3" type="submit">{t(lang, "pull_settlement")}</button>
+        </form>
         <form action={reconAction} className="mt-2 flex gap-2">
           <input name="file" type="file" accept=".csv,text/csv" />
           <button className="min-h-11 border border-line bg-white px-3" type="submit">{t(lang, "import")}</button>
         </form>
-        <p className="mt-1 text-xs">CSV columns: external_ref,amount_sle</p>
+        <p className="mt-1 text-xs">external_ref,amount_sle in leones. Or reference,value in cents.</p>
         {batches.map((batch) => <p key={String(batch.id)} className="text-sm">Batch {String(batch.id)} matched {String(batch.matched)} / bad {String(batch.exceptions)}</p>)}
         <form action={supplementAction} className="mt-3 grid gap-2 md:grid-cols-4">
           <input name="number" placeholder="LD-26-1003" className="min-h-11 border border-line bg-white px-2" />

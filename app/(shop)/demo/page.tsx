@@ -2,6 +2,7 @@ import Link from "next/link";
 import { demoResetAction } from "@/app/actions";
 import { getLang } from "@/lib/auth";
 import { t } from "@/lib/i18n";
+import { getSettings } from "@/lib/settings";
 
 const STEPS = [
   ["/", "Home, two shops, container"],
@@ -25,11 +26,12 @@ const STEPS = [
 export default async function DemoPage({ searchParams }: { searchParams: Promise<{ reset?: string }> }) {
   const sp = await searchParams;
   const lang = await getLang();
+  const demo = getSettings().demo_mode;
   return (
     <div>
       <h1 className="text-3xl font-semibold">{t(lang, "script")}</h1>
       {sp.reset ? <p className="mt-2 text-sm">Demo data is back to the start.</p> : null}
-      <p className="mt-2 text-sm">Customer +232 76 111 001. Staff password Demo#2026. Resetting the demo data needs Ada signed in as super admin.</p>
+      {demo ? <p className="mt-2 text-sm">Customer +232 76 111 001. Staff password Demo#2026. Resetting the demo data needs Ada signed in as super admin.</p> : null}
       <ol className="mt-4 space-y-2">
         {STEPS.map(([href, label], index) => (
           <li key={href}>

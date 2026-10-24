@@ -5,7 +5,8 @@ import { hitLimit } from "./commerce";
 import { getSettings } from "./settings";
 import { addHours, normalizePhone, nowIso } from "./format";
 import type { Lang } from "./i18n";
-import { randomCode, randomId, verifyPassword } from "./password";
+import { monimeReady } from "./channels";
+import { randomCode, randomId, sameText, verifyPassword } from "./password";
 
 function sessionCookie(maxAge: number) {
   return {
@@ -44,19 +45,38 @@ export async function ensureCartToken() {
   return token;
 }
 
+const CUSTOMER_SESSION_MS = 60 * 60 * 24 * 30 * 1000;
+const STAFF_SESSION_MS = 60 * 60 * 12 * 1000;
+
+export function sessionExpired(createdAt: string, kind: "customer" | "staff", now = Date.now()) {
+  const at = Date.parse(createdAt);
+  if (!Number.isFinite(at)) return true;
+  return now - at > (kind === "staff" ? STAFF_SESSION_MS : CUSTOMER_SESSION_MS);
+}
+
+function liveSession(sid: string, kind: "customer" | "staff") {
+  const session = one<{ user_id: number; kind: string; created_at: string }>("SELECT user_id, kind, created_at FROM sessions WHERE id = ?", sid);
+  if (!session || session.kind !== kind) return null;
+  if (sessionExpired(session.created_at, kind)) {
+    run("DELETE FROM sessions WHERE id = ?", sid);
+    return null;
+  }
+  return session;
+}
+
 export async function currentUser() {
   const sid = (await jar()).get("ld_sid")?.value;
   if (!sid) return null;
-  const session = one<{ user_id: number; kind: string }>("SELECT user_id, kind FROM sessions WHERE id = ?", sid);
-  if (!session || session.kind !== "customer") return null;
+  const session = liveSession(sid, "customer");
+  if (!session) return null;
   return one<UserRow>("SELECT id, phone, name, email, pickup_point_id FROM users WHERE id = ?", session.user_id) || null;
 }
 
 export async function currentStaff() {
   const sid = (await jar()).get("ld_staff")?.value;
   if (!sid) return null;
-  const session = one<{ user_id: number; kind: string }>("SELECT user_id, kind FROM sessions WHERE id = ?", sid);
-  if (!session || session.kind !== "staff") return null;
+  const session = liveSession(sid, "staff");
+  if (!session) return null;
   return one<StaffRow>("SELECT id, email, name, role, active FROM staff WHERE id = ? AND active = 1", session.user_id) || null;
 }
 
@@ -73,7 +93,7 @@ export async function requestOtp(phoneRaw: string) {
   insert("INSERT INTO otp_codes (phone, code, purpose, expires_at) VALUES (?,?,?,?)", phone, code, "login", addHours(nowIso(), 0.16));
   const box = await jar();
   box.set("ld_otp_phone", phone, sessionCookie(600));
-  if (getSettings().demo_mode) box.set("ld_otp_hint", code, sessionCookie(600));
+  if (getSettings().demo_mode && !monimeReady()) box.set("ld_otp_hint", code, sessionCookie(600));
   return phone;
 }
 
@@ -85,7 +105,7 @@ export async function verifyOtp(phoneRaw: string, code: string, name: string) {
     phone,
     nowIso(),
   );
-  if (!row || row.code !== code.trim()) throw new Error("That code is not right.");
+  if (!row || !sameText(row.code, code.trim())) throw new Error("That code is not right.");
   run("UPDATE otp_codes SET used = 1 WHERE id = ?", row.id);
   let user = one<UserRow>("SELECT id, phone, name, email, pickup_point_id FROM users WHERE phone = ?", phone);
   if (!user) {
@@ -120,19 +140,20 @@ export async function staffPassword(email: string, password: string) {
   insert("INSERT INTO otp_codes (phone, code, purpose, expires_at) VALUES (?,?,?,?)", staff.email, code, "staff", addHours(nowIso(), 0.16));
   const box = await jar();
   box.set("ld_staff_pending", staff.email, sessionCookie(600));
-  if (getSettings().demo_mode) box.set("ld_staff_hint", code, sessionCookie(600));
+  if (getSettings().demo_mode && !monimeReady()) box.set("ld_staff_hint", code, sessionCookie(600));
 }
 
 export async function staffSecond(code: string) {
   const box = await jar();
   const email = box.get("ld_staff_pending")?.value;
   if (!email) throw new Error("Start again with your password.");
+  hitLimit(`staff-otp:${email.toLowerCase()}`, 5, 600);
   const row = one<{ id: number; code: string }>(
     "SELECT id, code FROM otp_codes WHERE phone = ? AND purpose = 'staff' AND used = 0 AND expires_at > ? ORDER BY id DESC LIMIT 1",
     email,
     nowIso(),
   );
-  if (!row || row.code !== code.trim()) throw new Error("That second code is not right.");
+  if (!row || !sameText(row.code, code.trim())) throw new Error("That second code is not right.");
   run("UPDATE otp_codes SET used = 1 WHERE id = ?", row.id);
   const staff = one<StaffRow>("SELECT id, email, name, role, active FROM staff WHERE email = ?", email);
   if (!staff) throw new Error("Staff account missing.");

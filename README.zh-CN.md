@@ -135,6 +135,14 @@ npm run uat
 npm run backup
 ```
 
+## 版本
+
+上面的章节是第一次公开的原文。后来的迭代写在旁边，不替换这些章节。
+
+- [更新日志](CHANGELOG.zh-CN.md) · [English](CHANGELOG.md) · [Français](CHANGELOG.fr.md)
+- [0.2.0 迭代说明](docs/iteration-2026-10-24.html)，中文、英文、法文
+- 第一份完成度说明：[docs/index.html](docs/index.html)
+
 ## 许可证
 
 [MIT](LICENSE)。版权所有 © 2026 Alex Hs <bigbrogbpwin@gmail.com>。许可证以英文文本为准。该文件里的中文和法文只供阅读。

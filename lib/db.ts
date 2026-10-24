@@ -284,6 +284,7 @@ CREATE TABLE IF NOT EXISTS refunds (
   requested_by TEXT,
   approver1 TEXT,
   approver2 TEXT,
+  payout_ref TEXT,
   created_at TEXT NOT NULL,
   paid_at TEXT
 );
@@ -511,6 +512,7 @@ function migrate(db: Sql) {
   add("orders", "coupon_code", "coupon_code TEXT");
   add("seller_apps", "reject_reason", "reject_reason TEXT");
   add("seller_apps", "reviewed_at", "reviewed_at TEXT");
+  add("refunds", "payout_ref", "payout_ref TEXT");
 }
 
 export function getDb(): Sql {

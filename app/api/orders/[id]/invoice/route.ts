@@ -10,7 +10,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
   return new Response(new Uint8Array(pdf.bytes), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${pdf.filename}"`,
+      "Content-Disposition": `attachment; filename="${pdf.filename.replace(/[^A-Za-z0-9.-]/g, "") || "invoice.pdf"}"`,
       "Cache-Control": "private, no-store",
     },
   });

@@ -1,6 +1,9 @@
 "use server";
 
+import path from "path";
 import { redirect } from "next/navigation";
+import { backupTree } from "@/lib/backup";
+import { MonimeError, monimeCreditCsv, monimeReady, openMonimeCheckout } from "@/lib/channels";
 import { currentStaff, currentUser, ensureCartToken, getLang, logoutCustomer, logoutStaff, readCartToken, requestOtp, setLang, staffPassword, staffSecond, verifyOtp } from "@/lib/auth";
 import {
   acceptQuote,
@@ -13,6 +16,7 @@ import {
   checkout,
   confirmBalance,
   dashboard,
+  dispatchRefunds,
   importProducts,
   importSettlement,
   issueQuote,
@@ -40,6 +44,7 @@ import {
   type StaffActor,
 } from "@/lib/commerce";
 import { one, resetDatabase, run } from "@/lib/db";
+import { flushOutbound } from "@/lib/notify";
 import { getSettings } from "@/lib/settings";
 import { saveBuffer, saveUpload } from "@/lib/uploads";
 import { matchImage } from "@/lib/commerce";
@@ -64,6 +69,21 @@ async function staff(): Promise<StaffActor> {
   const row = await currentStaff();
   if (!row) redirect("/admin/login");
   return row;
+}
+
+async function flushLive() {
+  try {
+    await dispatchRefunds();
+    await flushOutbound();
+  } catch {
+    /* Queued payouts and messages retry from /api/cron/daily. */
+  }
+}
+
+function requestOrigin() {
+  const origin = (process.env.APP_ORIGIN || "").replace(/\/$/, "");
+  if (!/^https?:\/\/[a-z0-9.-]+(?::\d+)?$/i.test(origin)) throw new RuleError("Set APP_ORIGIN before taking live payments.");
+  return origin;
 }
 
 export async function setLangAction(formData: FormData) {
@@ -189,11 +209,39 @@ export async function payAction(formData: FormData) {
   const user = await currentUser();
   if (!user) redirect(`/login?next=${encodeURIComponent(safePath(`/pay/${groupId}`))}`);
   try {
-    const group = one<{ charged_sle: number; user_id: number }>("SELECT charged_sle, user_id FROM payment_groups WHERE id = ?", groupId);
+    const group = one<{ charged_sle: number; user_id: number; number: string; raw_json: string | null; status: string }>(
+      "SELECT charged_sle, user_id, number, raw_json, status FROM payment_groups WHERE id = ?",
+      groupId,
+    );
     if (!group || group.user_id !== user.id) throw new RuleError("Payment not found.");
+    if (group.status === "success") redirect(`/pay/result/${groupId}`);
+    if (process.env.MONIME_SECRET && !process.env.MONIME_SPACE_ID && method !== "intl_card") {
+      throw new RuleError("Set MONIME_SPACE_ID before taking live payments.");
+    }
+    if (method === "intl_card" && !getSettings().demo_mode && !process.env.INTL_CARD_SECRET) {
+      throw new RuleError("International card is not connected yet.");
+    }
+    if (monimeReady() && method !== "intl_card" && !failIt) {
+      const plan = JSON.parse(group.raw_json || "{}") as { monime?: { url?: string; method?: string } };
+      if (plan.monime?.url && plan.monime.method === method) redirect(plan.monime.url);
+      const origin = requestOrigin();
+      const session = await openMonimeCheckout({
+        groupId,
+        groupNumber: group.number,
+        amountSle: group.charged_sle,
+        method,
+        successUrl: `${origin}/pay/result/${groupId}`,
+        cancelUrl: `${origin}/pay/${groupId}`,
+      });
+      plan.monime = session;
+      run("UPDATE payment_groups SET raw_json = ? WHERE id = ?", JSON.stringify(plan), groupId);
+      redirect(session.url);
+    }
     if (!getSettings().demo_mode) throw new RuleError("Live checkout is not connected yet.");
+    if (monimeReady() && failIt) throw new RuleError("Live checkout cannot simulate a failure.");
     const ref = `${failIt ? "fail" : "demo"}-${groupId}-${Date.now()}`;
     settlePayment({ groupId, externalRef: ref, status: failIt ? "failed" : "success", method, amountSle: group.charged_sle });
+    await flushLive();
   } catch (error) {
     fail(error, `/pay/${groupId}`);
   }
@@ -215,6 +263,7 @@ export async function demoQuoteAction(formData: FormData) {
   const id = Number(formData.get("id"));
   const user = await currentUser();
   if (!user) redirect(`/login?next=/link/${id}`);
+  if (!getSettings().demo_mode) fail(new RuleError("Quotes are priced by the buying desk."), `/link/${id}`);
   try {
     issueQuote(null, id, { title: "Linked item from your URL", cny: 36, weightG: 400, l: 25, w: 18, h: 8, dutyPct: 10, hs: "8544.42", marginPct: 35 }, user.id);
   } catch (error) {
@@ -332,10 +381,10 @@ export async function addressAction(formData: FormData) {
   insert(
     "INSERT INTO addresses (user_id, name, phone, area, line, is_default) VALUES (?,?,?,?,?,1)",
     user.id,
-    String(formData.get("name") || user.name),
-    String(formData.get("phone") || user.phone),
-    String(formData.get("area") || "freetown"),
-    String(formData.get("line") || ""),
+    String(formData.get("name") || user.name).slice(0, 80),
+    String(formData.get("phone") || user.phone).slice(0, 20),
+    String(formData.get("area") || "freetown").slice(0, 40),
+    String(formData.get("line") || "").slice(0, 160),
   );
   redirect("/account");
 }
@@ -381,11 +430,13 @@ export async function advanceAction(formData: FormData) {
       evidence,
       bl: String(formData.get("bl") || ""),
       measuredCm3: Number(formData.get("cm3") || "0") || undefined,
+      weightG: Number(formData.get("weight") || "0") || undefined,
       code: String(formData.get("code") || ""),
     });
   } catch (error) {
     fail(error, `/admin/orders/${orderId}`);
   }
+  await flushLive();
   redirect(`/admin/orders/${orderId}`);
 }
 
@@ -407,6 +458,7 @@ export async function balanceAction(formData: FormData) {
   } catch (error) {
     fail(error, `/admin/orders/${orderId}`);
   }
+  await flushLive();
   redirect(`/admin/orders/${orderId}`);
 }
 
@@ -426,6 +478,7 @@ export async function refundAction(formData: FormData) {
   } catch (error) {
     fail(error, `/admin/orders/${orderId}`);
   }
+  await flushLive();
   redirect(`/admin/orders/${orderId}`);
 }
 
@@ -437,6 +490,7 @@ export async function approveRefundAction(formData: FormData) {
   } catch (error) {
     fail(error, "/admin/finance");
   }
+  await flushLive();
   redirect("/admin/finance");
 }
 
@@ -458,6 +512,7 @@ export async function issueQuoteAction(formData: FormData) {
   } catch (error) {
     fail(error, "/admin/quotes");
   }
+  await flushLive();
   redirect("/admin/quotes");
 }
 
@@ -665,18 +720,19 @@ export async function resendAction(formData: FormData) {
   } catch (error) {
     fail(error, `/admin/orders/${orderId}`);
   }
+  await flushLive();
   redirect(`/admin/orders/${orderId}`);
 }
 
 export async function demoResetAction() {
   const actor = await staff();
-  if (!getSettings().demo_mode || actor.role !== "super_admin") redirect("/");
+  if (!getSettings().demo_mode || monimeReady() || actor.role !== "super_admin") redirect("/");
   resetDatabase();
   redirect("/demo?reset=1");
 }
 
 export async function demoAdvanceAction(formData: FormData) {
-  if (!getSettings().demo_mode) redirect("/");
+  if (!getSettings().demo_mode || monimeReady()) redirect("/");
   const user = await currentUser();
   const orderId = Number(formData.get("order"));
   if (!user) redirect(`/login?next=/orders/${orderId}`);
@@ -694,11 +750,13 @@ export async function demoAdvanceAction(formData: FormData) {
       note: to === "PROCURED" ? "1688 order 88421 demo" : "Demo desk",
       evidence: "/photos/wh-1.jpg",
       bl: to === "SHIPPED" ? "MSCU990011" : "",
+      weightG: to === "IN_CN_WH" ? 400 : undefined,
       code: order.pickup_code || "",
     });
   } catch (error) {
     fail(error, `/orders/${orderId}`);
   }
+  await flushLive();
   redirect(`/orders/${orderId}`);
 }
 
@@ -713,9 +771,38 @@ export async function replayAction(formData: FormData) {
 }
 
 export async function reportNote() {
+  await staff();
   return buildReport(new Date(Date.now() - 400 * 86400000).toISOString(), new Date(Date.now() + 86400000).toISOString());
 }
 
 export async function desk() {
+  await staff();
   return dashboard();
+}
+
+export async function backupAction() {
+  const actor = await staff();
+  if (actor.role !== "super_admin") fail(new RuleError("Admin only."), "/admin/settings");
+  try {
+    backupTree({
+      dbFile: process.env.DB_PATH || path.join(process.cwd(), "data", "ledirect.sqlite"),
+      uploadDir: path.join(process.cwd(), "data", "uploads"),
+      destRoot: path.join(process.cwd(), "data", "backups"),
+    });
+  } catch (error) {
+    fail(error, "/admin/settings");
+  }
+  redirect("/admin/settings?backup=1");
+}
+
+export async function pullSettlementAction() {
+  const actor = await staff();
+  try {
+    if (!monimeReady()) throw new RuleError("Set MONIME_SECRET and MONIME_SPACE_ID first.");
+    const result = importSettlement(await monimeCreditCsv(), actor);
+    redirect(`/admin/finance?matched=${result.matched}&bad=${result.exceptions}`);
+  } catch (error) {
+    if (error instanceof MonimeError) fail(error, "/admin/finance");
+    fail(error, "/admin/finance");
+  }
 }

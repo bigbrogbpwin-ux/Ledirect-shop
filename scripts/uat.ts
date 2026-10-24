@@ -260,6 +260,9 @@ commerce.setSetting(ada, "whatsapp_down", "0");
 commerce.importSettlement("external_ref,amount_sle\nMISSING-REF,10\n", { id: 6, name: "Joseph", role: "finance", email: "joseph@ledirect.demo" });
 const recon = one<{ c: number }>("SELECT COUNT(*) AS c FROM tickets WHERE type = 'recon' AND subject LIKE '%MISSING-REF%'")!;
 assert.ok(recon.c >= 1, "settlement difference opens a case");
+commerce.importSettlement("reference,value\nMISSING-REF,1000\n", { id: 6, name: "Joseph", role: "finance", email: "joseph@ledirect.demo" });
+const reconAgain = one<{ c: number }>("SELECT COUNT(*) AS c FROM tickets WHERE type = 'recon' AND subject LIKE '%MISSING-REF%'")!;
+assert.equal(reconAgain.c, recon.c, "the same settlement difference does not open a second case");
 
 const fxLogs = one<{ c: number }>("SELECT COUNT(*) AS c FROM audit_logs WHERE action IN ('fx_propose','fx_activate','setting')")!;
 assert.ok(fxLogs.c >= 1, "audit log records rate and settings");
@@ -287,6 +290,70 @@ const mark = probe3.prepare("SELECT v FROM mark").get() as { v: string };
 probe3.close();
 assert.equal(mark.v, "one", "backup restore");
 assert.equal(readFileSync(path.join(uploadDir, "note.txt"), "utf8"), "keep");
+
+const iron = one<{ id: number }>("SELECT id FROM products WHERE sku = 'HOME-IRON'")!;
+const sea = commerce.checkout({
+  userId: user.id,
+  lines: [{ productId: iron.id, variantId: null, qty: 1 }],
+  shipMethod: "pickup",
+  pickupPointId: 1,
+  freightMode: "sea",
+  useWallet: false,
+  source: "catalog",
+  lang: "en",
+});
+const seaGroup = one<{ charged_sle: number }>("SELECT charged_sle FROM payment_groups WHERE id = ?", sea.groupId)!;
+commerce.settlePayment({ groupId: sea.groupId, externalRef: "UAT-SEA", status: "success", method: "orange", amountSle: seaGroup.charged_sle });
+const wei = { id: 1, name: "Wei", role: "procurement", email: "wei@ledirect.demo" };
+commerce.advanceOrder(wei, sea.orderIds[0], "PROCURING", { note: "start" });
+assert.throws(() => commerce.advanceOrder(wei, sea.orderIds[0], "PROCURED", {}), /purchase record/);
+commerce.advanceOrder(wei, sea.orderIds[0], "PROCURED", { note: "1688 10001" });
+assert.throws(() => commerce.advanceOrder(wei, sea.orderIds[0], "IN_CN_WH", { note: "weighed" }), /weighing photo/);
+commerce.advanceOrder(wei, sea.orderIds[0], "IN_CN_WH", { evidence: "/photos/wh-1.jpg", weightG: 1100 });
+const weighed = one<{ note: string | null }>("SELECT note FROM order_events WHERE order_id = ? AND status = 'IN_CN_WH'", sea.orderIds[0]);
+assert.match(weighed?.note || "", /1100 g/);
+
+const quoteId = commerce.submitQuote(user.id, "https://detail.1688.com/offer/1.html", 1, "uat");
+commerce.setSetting(ada, "demo_mode", "0");
+try {
+  assert.throws(
+    () => commerce.issueQuote(null, Number(quoteId), { title: "x", cny: 10, weightG: 100, l: 10, w: 10, h: 10, dutyPct: 10, hs: "8544.42", marginPct: 35 }, user.id),
+    /buying desk/,
+  );
+} finally {
+  commerce.setSetting(ada, "demo_mode", "1");
+}
+
+const { readPayNotice, settlementToCsv } = await import("../lib/channels");
+const notice = readPayNotice(JSON.stringify({
+  event: { id: "wke-1", name: "checkout_session.completed" },
+  data: {
+    id: "cos-1",
+    status: "completed",
+    reference: "PG-1",
+    orderNumber: "808",
+    metadata: { groupId: "12", method: "orange" },
+    amount: { currency: "SLE", value: 14500 },
+  },
+}));
+assert.equal(notice.kind, "checkout");
+if (notice.kind === "checkout") {
+  assert.equal(notice.groupId, 12);
+  assert.equal(notice.amountSle, 145);
+  assert.equal(notice.externalRef, "808");
+  assert.equal(notice.status, "success");
+}
+assert.match(settlementToCsv("reference,value\nABC,14500"), /ABC,145/);
+assert.match(settlementToCsv("external_ref,amount_sle\nABC,145"), /ABC,145/);
+
+const { sessionExpired } = await import("../lib/auth");
+assert.equal(sessionExpired(new Date(Date.now() - 13 * 3600_000).toISOString(), "staff"), true);
+assert.equal(sessionExpired(new Date(Date.now() - 3600_000).toISOString(), "staff"), false);
+assert.equal(sessionExpired(new Date(Date.now() - 31 * 86400000).toISOString(), "customer"), true);
+
+assert.throws(() => commerce.setSetting(ada, "webhook_secret", "replaced"), /cannot be changed/);
+assert.throws(() => commerce.saveStaff(ada, ada.id, "owner", true), /Unknown role/);
+assert.throws(() => commerce.saveStaff(ada, ada.id, "ops", true), /another admin/);
 
 console.log("uat ok");
 }

@@ -1,5 +1,7 @@
-import { settingAction } from "@/app/actions";
+import path from "path";
+import { backupAction, settingAction } from "@/app/actions";
 import { ErrorNote } from "@/components/card";
+import { latestBackup } from "@/lib/backup";
 import { requireStaffRole, getLang } from "@/lib/auth";
 import { t } from "@/lib/i18n";
 import { getSettings } from "@/lib/settings";
@@ -10,6 +12,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const lang = await getLang();
   const sp = await searchParams;
   const settings = getSettings();
+  const last = latestBackup(path.join(process.cwd(), "data", "backups"));
   const fields = ["sea_usd_cents_per_cbm", "air_usd_cents_per_kg", "delivery_sle", "free_delivery_sle", "split_threshold_sle", "deposit_bps"] as const;
   return (
     <div>
@@ -40,6 +43,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           </select>
         </label>
         <button className="min-h-11 bg-sea px-3 text-white" type="submit">{t(lang, "save")}</button>
+      </form>
+      <form action={backupAction} className="mt-6">
+        <button className="min-h-11 border border-line bg-white px-3" type="submit">{t(lang, "backup_now")}</button>
+        <p className="mt-2 text-sm">{last ? path.basename(last) : ""}</p>
       </form>
     </div>
   );

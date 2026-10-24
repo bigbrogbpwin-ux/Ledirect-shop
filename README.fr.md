@@ -135,6 +135,14 @@ npm run uat
 npm run backup
 ```
 
+## Versions
+
+Les chapitres ci-dessus sont le premier texte public. Les itérations suivantes sont notées à côté et ne les remplacent pas.
+
+- [Journal](CHANGELOG.fr.md) · [English](CHANGELOG.md) · [中文](CHANGELOG.zh-CN.md)
+- [Note d'itération 0.2.0](docs/iteration-2026-10-24.html), en chinois, anglais et français
+- Première note d'avancement : [docs/index.html](docs/index.html)
+
 ## Licence
 
 [MIT](LICENSE). Copyright © 2026 Alex Hs <bigbrogbpwin@gmail.com>. Le texte anglais de la licence fait foi. Le chinois et le français dans ce fichier sont là pour la lecture.

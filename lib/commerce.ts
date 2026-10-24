@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "crypto";
-import { refundDestination } from "./channels";
+import { MonimeError, refundDestination, sendMonimePayout, settlementToCsv } from "./channels";
 import { insert, many, one, run, tx } from "./db";
 import { activeFx, freightOf, getSettings } from "./settings";
 import { notifyUser } from "./notify";
@@ -802,19 +802,21 @@ export function settlePayment(input: { groupId: number; externalRef: string; sta
       );
       const order = one<{ id: number; number: string }>("SELECT id, number FROM orders WHERE group_id = ? LIMIT 1", input.groupId);
       if (order) {
+        const back = refundDestination(input.method);
+        if (back === "wallet") addWallet(group.user_id, "refund", input.amountSle, order.number, "Duplicate payment returned");
         insert(
           "INSERT INTO refunds (order_id, reason, rule, amount_sle, choice, status, requested_by, created_at, paid_at) VALUES (?,?,?,?,?,?,?,?,?)",
           order.id,
           "Duplicate payment returned",
-          "platform_fault",
+          "duplicate",
           input.amountSle,
           "refund",
-          "paid",
+          back === "monime" ? "queued" : "paid",
           "system",
           nowIso(),
-          nowIso(),
+          back === "monime" ? null : nowIso(),
         );
-        notifyUser(group.user_id, "refund", { number: order.number, amount: input.amountSle, method: input.method }, "en", order.id);
+        if (back === "wallet") notifyUser(group.user_id, "refund", { number: order.number, amount: input.amountSle, method: "wallet" }, "en", order.id);
       }
       return { duplicate: false as const, excess: true as const };
     }
@@ -867,7 +869,7 @@ export function advanceOrder(
   actor: StaffActor,
   orderId: number,
   to: string,
-  extra: { note?: string; evidence?: string; bl?: string; measuredCm3?: number; code?: string } = {},
+  extra: { note?: string; evidence?: string; bl?: string; measuredCm3?: number; weightG?: number; code?: string } = {},
 ) {
   return tx(() => {
     const order = one<{ id: number; zone: string; status: string; number: string; user_id: number; pickup_code: string | null; freight_mode: string }>(
@@ -882,8 +884,8 @@ export function advanceOrder(
       const allowed = actor.role === "warehouse" ? warehouseTo : actor.role === "procurement" ? buyTo : [];
       if (!allowed.includes(to)) throw new RuleError(`The ${actor.role} role cannot move an order to ${to}.`);
     }
-    if (to === "PROCURED" && !(extra.note || extra.evidence)) throw new RuleError("Add the 1688 order number or a screenshot.");
-    if (to === "IN_CN_WH" && !(extra.evidence || extra.note)) throw new RuleError("Add the weighing photo.");
+    if (to === "PROCURED" && !String(extra.note || "").trim()) throw new RuleError("Add the purchase record.");
+    if (to === "IN_CN_WH" && !extra.evidence) throw new RuleError("Add the weighing photo.");
     if (to === "SHIPPED" && !extra.bl) throw new RuleError("Add the bill of lading number.");
     if (to === "COMPLETED") {
       if (!extra.code || extra.code !== order.pickup_code) throw new RuleError("Pickup code does not match.");
@@ -905,7 +907,7 @@ export function advanceOrder(
       "INSERT INTO order_events (order_id, status, note, evidence_url, evidence_kind, actor, created_at) VALUES (?,?,?,?,?,?,?)",
       orderId,
       to,
-      [extra.note, extra.bl ? `B/L ${extra.bl}` : ""].filter(Boolean).join(" · ") || null,
+      [extra.note, extra.weightG && extra.weightG > 0 ? `${Math.round(extra.weightG)} g` : "", extra.bl ? `B/L ${extra.bl}` : ""].filter(Boolean).join(" · ") || null,
       extra.evidence || null,
       extra.evidence ? "photo" : extra.bl ? "bl" : null,
       actor.email,
@@ -1128,14 +1130,30 @@ function executeRefund(refundId: number) {
     insert("INSERT INTO order_events (order_id, status, note, actor, created_at) VALUES (?,?,?,?,?)", copyId, "PAID", "Free resend", "refund", nowIso());
     return;
   }
-  const pay = one<{ method: string }>(
-    "SELECT p.method FROM payments p JOIN orders o ON o.group_id = p.group_id WHERE o.id = ? AND p.status = 'success' ORDER BY p.id DESC LIMIT 1",
-    order.id,
-  );
-  const method = pay?.method || "orange";
+  const method = paidMethodFor(order.id);
   const destination = refundDestination(method);
-  const paidMethod = destination === "wallet" ? "wallet" : method;
-  if (destination === "wallet") addWallet(order.user_id, "refund", refund.amount_sle, order.number, "Refund");
+  if (destination === "monime" && refund.amount_sle > 0) {
+    run("UPDATE refunds SET status = 'queued' WHERE id = ?", refund.id);
+    return;
+  }
+  creditRefund(order, refund, "wallet", true);
+}
+
+function paidMethodFor(orderId: number) {
+  const pay = one<{ method: string }>(
+    "SELECT p.method FROM payments p JOIN orders o ON o.group_id = p.group_id WHERE o.id = ? AND p.status = 'success' AND p.purpose != 'refund' ORDER BY CASE WHEN p.method = 'wallet' THEN 1 ELSE 0 END, p.id DESC LIMIT 1",
+    orderId,
+  );
+  return pay?.method || "orange";
+}
+
+function creditRefund(
+  order: { id: number; user_id: number; number: string; status: string },
+  refund: { id: number; amount_sle: number; rule: string },
+  paidMethod: string,
+  creditWallet: boolean,
+) {
+  if (creditWallet) addWallet(order.user_id, "refund", refund.amount_sle, order.number, "Refund");
   insert(
     "INSERT INTO payments (order_id, user_id, purpose, method, amount_sle, status, external_ref, created_at) VALUES (?,?,?,?,?,?,?,?)",
     order.id,
@@ -1155,6 +1173,87 @@ function executeRefund(refundId: number) {
     insert("INSERT INTO order_events (order_id, status, note, actor, created_at) VALUES (?,?,?,?,?)", order.id, "CANCELLED", refund.rule, "refund", nowIso());
   }
   notifyUser(order.user_id, "refund", { number: order.number, amount: refund.amount_sle, method: paidMethod }, "en", order.id);
+}
+
+export function completeQueuedRefund(refundId: number) {
+  return tx(() => {
+    const refund = one<{ id: number; order_id: number; amount_sle: number; rule: string; status: string }>("SELECT * FROM refunds WHERE id = ?", refundId);
+    if (!refund || refund.status === "paid" || refund.status === "reship") return { done: true as const };
+    if (refund.status !== "queued") return { done: false as const };
+    const order = one<{ id: number; user_id: number; number: string; status: string }>("SELECT * FROM orders WHERE id = ?", refund.order_id);
+    if (!order) throw new RuleError("Order not found.");
+    creditRefund(order, refund, paidMethodFor(order.id), false);
+    return { done: true as const };
+  });
+}
+
+function openRefundTicket(orderId: number, userId: number, subject: string, body: string) {
+  const open = one("SELECT id FROM tickets WHERE type = 'refund' AND subject = ? AND status = 'open'", subject);
+  if (open) return;
+  const id = insert(
+    "INSERT INTO tickets (number, user_id, order_id, type, status, subject, sla_due_at, created_at) VALUES (?,?,?,?,?,?,?,?)",
+    nextCode("ticket_seq", "TK"),
+    userId,
+    orderId,
+    "refund",
+    "open",
+    subject,
+    addHours(nowIso(), 24),
+    nowIso(),
+  );
+  insert(
+    "INSERT INTO ticket_messages (ticket_id, author_kind, author_name, body, created_at) VALUES (?,?,?,?,?)",
+    id,
+    "staff",
+    "system",
+    body.slice(0, 500),
+    nowIso(),
+  );
+}
+
+export function failQueuedRefund(refundId: number, reason: string) {
+  const refund = one<{ id: number; order_id: number; status: string }>("SELECT id, order_id, status FROM refunds WHERE id = ?", refundId);
+  if (!refund || refund.status !== "queued") return;
+  run("UPDATE refunds SET status = 'failed' WHERE id = ?", refund.id);
+  const order = one<{ user_id: number; number: string }>("SELECT user_id, number FROM orders WHERE id = ?", refund.order_id);
+  openRefundTicket(refund.order_id, order?.user_id || 1, `Refund ${refund.id} on ${order?.number || refund.order_id} failed`, reason);
+}
+
+export async function dispatchRefunds() {
+  const rows = many<{ id: number; amount_sle: number; order_id: number; phone: string; method: string | null; user_id: number; number: string }>(
+    `SELECT r.id, r.amount_sle, r.order_id, u.phone, u.id AS user_id, o.number,
+      (SELECT p.method FROM payments p WHERE p.group_id = o.group_id AND p.status = 'success' AND p.purpose != 'refund' ORDER BY CASE WHEN p.method = 'wallet' THEN 1 ELSE 0 END, p.id DESC LIMIT 1) AS method
+     FROM refunds r
+     JOIN orders o ON o.id = r.order_id
+     JOIN users u ON u.id = o.user_id
+     WHERE r.status = 'queued' AND r.amount_sle > 0 AND (r.payout_ref IS NULL OR r.payout_ref = '')`,
+  );
+  let sent = 0;
+  for (const row of rows) {
+    const momo = row.method === "orange" || row.method === "afri" || row.method === "ussd";
+    if (!momo) {
+      const claim = run("UPDATE refunds SET payout_ref = 'manual' WHERE id = ? AND status = 'queued' AND (payout_ref IS NULL OR payout_ref = '')", row.id);
+      if (Number(claim.changes) > 0) {
+        openRefundTicket(row.order_id, row.user_id, `Refund ${row.id} on ${row.number} needs a manual payout`, `Original method ${row.method || "unknown"} cannot be returned by mobile money.`);
+      }
+      continue;
+    }
+    const claim = run("UPDATE refunds SET payout_ref = 'sending' WHERE id = ? AND status = 'queued' AND (payout_ref IS NULL OR payout_ref = '')", row.id);
+    if (Number(claim.changes) === 0) continue;
+    try {
+      const payout = await sendMonimePayout({ refundId: row.id, amountSle: row.amount_sle, phone: row.phone, method: row.method || "orange" });
+      run("UPDATE refunds SET payout_ref = ? WHERE id = ?", payout.id, row.id);
+      if (payout.status === "completed") completeQueuedRefund(row.id);
+      sent += 1;
+    } catch (error) {
+      if (error instanceof MonimeError && (error.status === 400 || error.status === 422)) {
+        failQueuedRefund(row.id, error.message);
+      } else {
+        run("UPDATE refunds SET payout_ref = NULL WHERE id = ? AND payout_ref = 'sending'", row.id);
+      }
+    }
+  }
+  return sent;
 }
 
 function releaseGroupHold(groupId: number) {
@@ -1437,7 +1536,7 @@ export function warnings() {
 
 export function importSettlement(text: string, actor: StaffActor) {
   assertRole(actor, "fx");
-  const rows = parseCsv(text).filter((r) => r[0] && r[0] !== "external_ref");
+  const rows = parseCsv(settlementToCsv(text)).filter((r) => r[0] && r[0] !== "external_ref");
   const batchId = insert(
     "INSERT INTO recon_batches (filename, imported_by, created_at) VALUES (?,?,?)",
     "upload.csv",
@@ -1453,7 +1552,18 @@ export function importSettlement(text: string, actor: StaffActor) {
       "SELECT id, amount_sle, group_id FROM payments WHERE external_ref = ? AND status = 'success' AND purpose != 'refund'",
       ref,
     );
-    if (pay && pay.amount_sle === amount) {
+    const same = pay && pay.amount_sle === amount;
+    const prior = one<{ status: string }>(
+      "SELECT status FROM recon_lines WHERE external_ref = ? AND amount_sle = ? ORDER BY id DESC LIMIT 1",
+      ref,
+      amount,
+    );
+    if (prior && prior.status === (same ? "matched" : "exception")) {
+      if (same) matched += 1;
+      else exceptions += 1;
+      continue;
+    }
+    if (same) {
       matched += 1;
       const order = one<{ id: number }>("SELECT id FROM orders WHERE group_id = ?", pay.group_id);
       insert("INSERT INTO recon_lines (batch_id, external_ref, amount_sle, status, order_id, note) VALUES (?,?,?,?,?,?)", batchId, ref, amount, "matched", order?.id || null, "");
@@ -1467,16 +1577,20 @@ export function importSettlement(text: string, actor: StaffActor) {
         "exception",
         pay ? "Amount differs" : "No payment with this reference",
       );
-      insert(
-        "INSERT INTO tickets (number, user_id, type, status, subject, sla_due_at, created_at) VALUES (?,?,?,?,?,?,?)",
-        nextCode("ticket_seq", "TK"),
-        1,
-        "recon",
-        "open",
-        `Settlement difference ${ref}`,
-        addHours(nowIso(), 24),
-        nowIso(),
-      );
+      const subject = `Settlement difference ${ref}`;
+      const open = one("SELECT id FROM tickets WHERE type = 'recon' AND subject = ? AND status = 'open'", subject);
+      if (!open) {
+        insert(
+          "INSERT INTO tickets (number, user_id, type, status, subject, sla_due_at, created_at) VALUES (?,?,?,?,?,?,?)",
+          nextCode("ticket_seq", "TK"),
+          1,
+          "recon",
+          "open",
+          subject,
+          addHours(nowIso(), 24),
+          nowIso(),
+        );
+      }
     }
   }
   run("UPDATE recon_batches SET matched = ?, exceptions = ? WHERE id = ?", matched, exceptions, batchId);
@@ -1547,8 +1661,25 @@ export function buildReport(fromIso: string, toIso: string) {
   };
 }
 
+const EDITABLE_SETTINGS = new Set([
+  "sea_usd_cents_per_cbm",
+  "air_usd_cents_per_kg",
+  "gst_deductible",
+  "delivery_sle",
+  "free_delivery_sle",
+  "split_threshold_sle",
+  "deposit_bps",
+  "demo_mode",
+  "whatsapp_down",
+  "show_trust_stats",
+  "ga4_id",
+  "meta_pixel_id",
+]);
+
 export function setSetting(actor: StaffActor, key: string, value: string) {
   assertRole(actor, "settings");
+  if (!EDITABLE_SETTINGS.has(key)) throw new RuleError("That setting cannot be changed here.");
+  if (value.length > 200) throw new RuleError("That value is too long.");
   const before = one<{ value: string }>("SELECT value FROM settings WHERE key = ?", key);
   run("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", key, value);
   audit(actor.email, "setting", key, before?.value ?? null, value);
@@ -1837,7 +1968,7 @@ export function openTicket(userId: number, orderId: number, type: string, body: 
     id,
     "user",
     user?.name || "Customer",
-    body,
+    body.slice(0, 2000),
     image || null,
     nowIso(),
   );
@@ -1854,7 +1985,7 @@ export function replyTicket(actor: StaffActor, ticketId: number, body: string, i
     ticketId,
     internal ? "internal" : "staff",
     actor.name,
-    body,
+    body.slice(0, 2000),
     nowIso(),
   );
   if (!internal && !ticket.first_response_at) {
@@ -1899,9 +2030,18 @@ export function savePost(actor: StaffActor, fields: Record<string, string>) {
   );
 }
 
+const STAFF_ROLES = ["super_admin", "ops", "procurement", "warehouse", "cs", "finance"];
+
 export function saveStaff(actor: StaffActor, id: number, role: string, active: boolean) {
   assertRole(actor, "people");
-  const before = one("SELECT role, active FROM staff WHERE id = ?", id);
+  if (!STAFF_ROLES.includes(role)) throw new RuleError("Unknown role.");
+  if (id === actor.id) throw new RuleError("Ask another admin to change your own seat.");
+  const before = one<{ role: string; active: number }>("SELECT role, active FROM staff WHERE id = ?", id);
+  if (!before) throw new RuleError("Staff account missing.");
+  if (before.role === "super_admin" && (role !== "super_admin" || !active)) {
+    const others = one<{ c: number }>("SELECT COUNT(*) AS c FROM staff WHERE role = 'super_admin' AND active = 1 AND id != ?", id);
+    if (!others?.c) throw new RuleError("Keep at least one active admin.");
+  }
   run("UPDATE staff SET role = ?, active = ? WHERE id = ?", role, active ? 1 : 0, id);
   audit(actor.email, "role", `staff:${id}`, before, { role, active });
 }

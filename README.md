@@ -141,6 +141,14 @@ Completion note, in Chinese, English, and French: open [docs/index.html](docs/in
 
 Note d'avancement en chinois, anglais et français : ouvrir [docs/index.html](docs/index.html) dans un navigateur. Démo : [https://19781231.xyz](https://19781231.xyz). Licence MIT. Vous pouvez l'adapter. Écrivez à bigbrogbpwin@gmail.com si besoin.
 
+## Releases
+
+The chapters above are the first public text. Later iterations are recorded beside them and do not replace them.
+
+- [Changelog](CHANGELOG.md) · [中文](CHANGELOG.zh-CN.md) · [Français](CHANGELOG.fr.md)
+- [0.2.0 iteration note](docs/iteration-2026-10-24.html), in Chinese, English, and French
+- First completion note: [docs/index.html](docs/index.html)
+
 ## License
 
 [MIT](LICENSE). Copyright © 2026 Alex Hs <bigbrogbpwin@gmail.com>. The English license text governs. Chinese and French in that file are there for reading.

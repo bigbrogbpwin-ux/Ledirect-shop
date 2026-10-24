@@ -4,6 +4,7 @@ import { getLang } from "@/lib/auth";
 import { many, one } from "@/lib/db";
 import { port } from "@/lib/channels";
 import { pick, t } from "@/lib/i18n";
+import { safeAsset, safeMedia } from "@/lib/safe";
 
 export async function LiveRoom({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -19,7 +20,7 @@ export async function LiveRoom({ params }: { params: Promise<{ id: string }> }) 
       <h1 className="text-3xl font-semibold">{pick(lang, post, "title")}</h1>
       <p className="mt-2 text-sm">{pick(lang, post, "body")}</p>
       <p className="mt-2 text-sm">{t(lang, "stream_reserved")} ({port("livestream").env})</p>
-      <video className="mt-4 w-full bg-black" controls poster={String(post.image || "")} src={String(post.video || "")} />
+      <video className="mt-4 w-full bg-black" controls poster={safeAsset(String(post.image || "")) || undefined} src={safeMedia(String(post.video || "")) || undefined} />
       <ul className="mt-4 space-y-2">
         {products.map((product) => (
           <li key={product.id} className="flex items-center justify-between border border-line bg-white p-3">

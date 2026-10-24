@@ -1,4 +1,5 @@
-import { insert, one } from "./db";
+import { postChannel } from "./channels";
+import { insert, many, one, run } from "./db";
 import { getSettings } from "./settings";
 import { le, nowIso } from "./format";
 import type { Lang } from "./i18n";
@@ -95,7 +96,9 @@ export function notifyUser(
   }
   const body = fill(pack[lang] || pack.en, strings);
   const down = getSettings().whatsapp_down;
-  const waOk = !down;
+  const waLive = Boolean(process.env.BSP_TOKEN && process.env.BSP_URL);
+  const smsLive = Boolean(process.env.SMS_TOKEN && process.env.SMS_URL);
+  const waStatus = down ? "failed" : waLive ? "queued" : "sent";
   const smsToo = key === "ready" || key === "pay_exception";
   insert(
     "INSERT INTO messages (user_id, channel, template_key, body, status, popup, order_id, created_at) VALUES (?,?,?,?,?,?,?,?)",
@@ -103,24 +106,50 @@ export function notifyUser(
     "whatsapp",
     key,
     body,
-    waOk ? "sent" : "failed",
-    waOk ? 1 : 0,
+    waStatus,
+    waStatus === "sent" ? 1 : 0,
     orderId ?? null,
     nowIso(),
   );
   if (smsToo) {
+    const smsStatus = smsLive ? "queued" : "sent";
     insert(
       "INSERT INTO messages (user_id, channel, template_key, body, status, popup, order_id, created_at) VALUES (?,?,?,?,?,?,?,?)",
       userId,
       "sms",
       key,
       body,
-      "sent",
-      waOk ? 0 : 1,
+      smsStatus,
+      waStatus === "failed" && smsStatus === "sent" ? 1 : 0,
       orderId ?? null,
       nowIso(),
     );
   }
+}
+
+const SMS_KEYS = new Set(["ready", "pay_exception"]);
+
+export async function flushOutbound() {
+  const rows = many<{ id: number; user_id: number; channel: string; template_key: string; body: string }>(
+    "SELECT id, user_id, channel, template_key, body FROM messages WHERE status = 'queued' ORDER BY id LIMIT 40",
+  );
+  let sent = 0;
+  for (const row of rows) {
+    const user = one<{ phone: string }>("SELECT phone FROM users WHERE id = ?", row.user_id);
+    const url = row.channel === "sms" ? process.env.SMS_URL : process.env.BSP_URL;
+    const token = row.channel === "sms" ? process.env.SMS_TOKEN : process.env.BSP_TOKEN;
+    const ok = Boolean(url && token && user?.phone) && (await postChannel(url || "", token || "", { to: user?.phone || "", body: row.body, template: row.template_key }));
+    run("UPDATE messages SET status = ?, popup = ? WHERE id = ?", ok ? "sent" : "failed", ok ? 1 : 0, row.id);
+    if (ok) sent += 1;
+    if (!ok && row.channel === "whatsapp" && SMS_KEYS.has(row.template_key)) {
+      run(
+        "UPDATE messages SET popup = 1 WHERE id = (SELECT id FROM messages WHERE user_id = ? AND channel = 'sms' AND template_key = ? ORDER BY id DESC LIMIT 1)",
+        row.user_id,
+        row.template_key,
+      );
+    }
+  }
+  return sent;
 }
 
 export { DEFAULT_TPL };

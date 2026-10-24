@@ -4,6 +4,7 @@ import { requireStaffRole, staffCan, getLang } from "@/lib/auth";
 import { many, one } from "@/lib/db";
 import { le } from "@/lib/format";
 import { t } from "@/lib/i18n";
+import { safeAsset } from "@/lib/safe";
 import { nextForward, statusLabel } from "@/lib/states";
 import { notFound } from "next/navigation";
 
@@ -26,7 +27,7 @@ export default async function OrderAdmin({ params, searchParams }: { params: Pro
       <ul className="mt-3 text-sm">{items.map((item) => <li key={item.id}>{item.title} × {item.qty}</li>)}</ul>
       <ol className="mt-3 space-y-1 text-sm">
         {events.map((event) => (
-          <li key={event.status + (event.note || "")}>{statusLabel(event.status, lang)} {event.note} {event.evidence_url ? <a className="underline" href={event.evidence_url}>file</a> : null}</li>
+          <li key={event.status + (event.note || "")}>{statusLabel(event.status, lang)} {event.note} {safeAsset(event.evidence_url) ? <a className="underline" href={safeAsset(event.evidence_url) || ""}>file</a> : null}</li>
         ))}
       </ol>
       {next && next !== "PAID" && staffCan(staff.role, "move") ? (
@@ -36,6 +37,7 @@ export default async function OrderAdmin({ params, searchParams }: { params: Pro
           <input name="note" placeholder={t(lang, "note")} className="min-h-11 border border-line bg-white px-2" />
           <input name="bl" placeholder={t(lang, "bl")} className="min-h-11 border border-line bg-white px-2" />
           <input name="cm3" placeholder={t(lang, "measured")} className="min-h-11 border border-line bg-white px-2" />
+          <input name="weight" placeholder={t(lang, "weight_g")} className="min-h-11 border border-line bg-white px-2" />
           <input name="code" placeholder={t(lang, "code")} defaultValue={String(order.pickup_code || "")} className="min-h-11 border border-line bg-white px-2" />
           <input name="file" type="file" accept="image/*" />
           <button className="min-h-11 bg-sea px-3 text-white" type="submit">{t(lang, "advance")} → {statusLabel(next, lang)}</button>

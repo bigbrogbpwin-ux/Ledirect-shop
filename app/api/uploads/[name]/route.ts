@@ -18,8 +18,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ name: string }
   const type = TYPES[ext];
   if (!type) return new Response("Not found", { status: 404 });
   const meta = one<{ visibility: string; user_id: number | null }>("SELECT visibility, user_id FROM uploads WHERE name = ?", name);
-  const legacyPublic = !meta && /^(sku|visual|evidence)-/.test(name);
-  if (!legacyPublic && meta?.visibility !== "public") {
+  if (!meta) return new Response("Not found", { status: 404 });
+  if (meta.visibility !== "public") {
     const staff = await currentStaff();
     const user = await currentUser();
     const ownerOk = meta?.visibility === "owner" && user && user.id === meta.user_id;

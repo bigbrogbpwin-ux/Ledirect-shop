@@ -5,6 +5,7 @@ import { many, one } from "@/lib/db";
 import { BRAND } from "@/lib/brand";
 import { freetown, le } from "@/lib/format";
 import { t } from "@/lib/i18n";
+import { safeAsset } from "@/lib/safe";
 import { getSettings } from "@/lib/settings";
 import { flowFor, refundRuleForStatus, statusLabel } from "@/lib/states";
 import { notFound, redirect } from "next/navigation";
@@ -47,7 +48,7 @@ export default async function OrderDetail({ params, searchParams }: { params: Pr
               <span>{statusLabel(step, lang)}</span>
               {event ? <span className="ml-2 text-xs">{freetown(event.created_at)}</span> : null}
               {event?.note ? <p>{event.note}</p> : null}
-              {event?.evidence_url ? <img src={event.evidence_url} alt="" className="mt-2 h-24 w-24 object-cover" /> : null}
+              {event && safeAsset(event.evidence_url) ? <img src={safeAsset(event.evidence_url) || ""} alt="" className="mt-2 h-24 w-24 object-cover" /> : null}
             </li>
           );
         })}
