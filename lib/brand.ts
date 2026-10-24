@@ -1,0 +1,15 @@
+export const BRAND = {
+  name: "LeDirect",
+  tagline: "China factory price. Freetown delivery.",
+  legal: "LeDirect Trading (SL) Ltd",
+  reg: "SL-DEMO-2026-00481",
+  warehouse: "12 Bai Bureh Road, Kissy, Freetown",
+  hours: "Mon–Sat 9:00–18:00",
+  agent: "Mariama Jalloh",
+  phone: "+232 76 555 014",
+  bankName: "Rokel Commercial Bank",
+  bankHolder: "LeDirect Trading (SL) Ltd",
+  bankAccount: "001-2345678-90",
+  bankBranch: "Siaka Stevens Street, Freetown",
+  note: "Working name for this demo. The brand, domain, and logo are still open.",
+};

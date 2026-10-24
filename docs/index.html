@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LeDirect · development completion</title>
+  <meta name="description" content="LeDirect demo completion in English, Chinese, and French. Live demo: https://19781231.xyz">
+  <style>
+    :root {
+      --sea: #0c3d38;
+      --foam: #e4eeea;
+      --ink: #132421;
+      --coral: #e23e12;
+      --line: #c9d6d1;
+      --paper: #f7f6f2;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font: 16px/1.6 "Iowan Old Style", Palatino, "Songti SC", "PingFang SC", Georgia, serif;
+    }
+    header, main, footer { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    header { padding: 28px 0 8px; }
+    .bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .brand { color: var(--sea); font-weight: 700; letter-spacing: 0.04em; text-decoration: none; }
+    nav { margin-left: auto; display: flex; gap: 8px; }
+    button {
+      min-height: 40px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      padding: 0 12px;
+      font: inherit;
+      cursor: pointer;
+    }
+    button[aria-pressed="true"] { background: var(--sea); color: #fff; border-color: var(--sea); }
+    h1 { font-size: 2rem; line-height: 1.2; margin: 18px 0 8px; }
+    h2 { font-size: 1.25rem; margin: 28px 0 8px; color: var(--sea); }
+    .muted { color: #3d524c; }
+    a { color: var(--coral); }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 18px 0; }
+    .stat { background: #fff; border: 1px solid var(--line); padding: 14px 16px; }
+    .stat b { display: block; font-size: 2rem; color: var(--sea); }
+    table { width: 100%; border-collapse: collapse; background: #fff; font-size: 0.95rem; }
+    th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: var(--sea); color: #fff; font-weight: 600; }
+    .note { background: var(--foam); border-left: 4px solid var(--sea); padding: 12px 14px; }
+    footer { padding: 28px 0 48px; }
+    [hidden] { display: none !important; }
+    @media (max-width: 640px) {
+      .stats { grid-template-columns: 1fr; }
+      nav { margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="bar">
+      <a class="brand" href="https://19781231.xyz">LeDirect</a>
+      <nav>
+        <button type="button" data-lang="zh" aria-pressed="true">中文</button>
+        <button type="button" data-lang="en" aria-pressed="false">English</button>
+        <button type="button" data-lang="fr" aria-pressed="false">Français</button>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <section lang="zh-CN">
+      <p class="muted">完成度说明 · 2026-10-24 · 提交 ed4d081</p>
+      <h1>客人可以把店走通。店还不能收真实的利昂。</h1>
+      <p>演示站：<a href="https://19781231.xyz">https://19781231.xyz</a>。走完整路线：<a href="https://19781231.xyz/demo">/demo</a>。</p>
+      <p>2026-10-24 11:37 核对过：首页、<a href="https://19781231.xyz/demo">/demo</a>、商家店 SEL-1001 和 <code>/api/health</code> 都是 HTTP 200。健康检查显示商品 260 个。这台服务器上还没有备份文件。</p>
+      <div class="stats">
+        <div class="stat"><b>90%</b>演示完成度</div>
+        <div class="stat"><b>38%</b>正式上线准备</div>
+      </div>
+      <p class="muted">按需求、第三方接通、测试、安全和运维加权，不是按代码行数。演示误差大约 ±4 个百分点，上线误差大约 ±8 个百分点。</p>
+      <h2>已经能跑的</h2>
+      <table>
+        <thead><tr><th>范围</th><th>状态</th><th>边界</th></tr></thead>
+        <tbody>
+          <tr><td>双区、购物车、结算</td><td>在系统里</td><td>订单落库。现货和海运可以付一次款，拆成两张订单。</td></tr>
+          <tr><td>定价、库存、状态机、拼柜</td><td>在系统里</td><td>金额用整数利昂。扣库存在事务里。非法状态跳转会被拦住。</td></tr>
+          <tr><td>贴链接、钱包、商家、侨民代付、优惠券、发票、内地提货点</td><td>在系统里</td><td>Bo、Kenema、Makeni 有写明的内陆费。银行卡和移动货币是模拟的。</td></tr>
+          <tr><td>1688、以图搜图、直播间</td><td>样本</td><td>接口在 lib/channels.ts。真实商品流、识图服务和直播地址没接。</td></tr>
+          <tr><td>支付和退款</td><td>只在内部</td><td>回调、幂等、对账、退款进钱包都有。Monime 密钥没接。</td></tr>
+          <tr><td>WhatsApp 和短信</td><td>只在站内</td><td>WhatsApp 失败会落到一条站内短信。没有 BSP，也没有塞拉利昂短信网关。</td></tr>
+          <tr><td>PWA、英 / 中 / 法</td><td>大体有</td><td>语言能切。商店按钮等原生应用。填了统计编号才会加载。</td></tr>
+          <tr><td>角色、上传、备份命令</td><td>在源码里</td><td>后台按角色限制。上传核对文件头。npm run backup 保留 30 天。线上这台还没有备份文件。</td></tr>
+        </tbody>
+      </table>
+      <h2>还敞着的</h2>
+      <table>
+        <thead><tr><th>级别</th><th>问题</th><th>影响</th></tr></thead>
+        <tbody>
+          <tr><td>P0</td><td>Monime、WhatsApp、短信、1688、识图没有正式密钥</td><td>演示不能真收款，也不能发真消息。</td></tr>
+          <tr><td>P1</td><td>reportNote 和 desk 是公开的 server action</td><td>未登录的人可以读到工作台数量和报表口径。</td></tr>
+          <tr><td>P1</td><td>演示回调密钥仍是仓库里的默认值</td><td>演示站在公网时，知道密钥的人可以伪造付款成功。</td></tr>
+          <tr><td>P1</td><td>员工第二组码没有单独限次，会话在数据库里不过期</td><td>浏览器关掉以后，旧会话号仍然有效。</td></tr>
+          <tr><td>P1</td><td>没有弱网测试，也没有低端 Android 真机</td><td>需求书里的真机验收还没做。</td></tr>
+          <tr><td>P2</td><td>没有对象存储，也没有病毒扫描</td><td>证件和付款凭证不再公开，但文件仍在应用磁盘上。</td></tr>
+        </tbody>
+      </table>
+      <h2>怎么进演示</h2>
+      <p class="note">顾客 +232 76 111 001，验证码显示在页面上。员工 ada@ledirect.demo，密码 Demo#2026，然后再输入员工页上的第二组码。这些是演示账号。</p>
+      <h2>自己用，或来信</h2>
+      <p>项目使用 MIT 许可证，欢迎自己定制使用。有需要可以联系 <a href="mailto:bigbrogbpwin@gmail.com">bigbrogbpwin@gmail.com</a>。</p>
+    </section>
+
+    <section lang="en" hidden>
+      <p class="muted">Completion note · 24 Oct 2026 · commit ed4d081</p>
+      <h1>A visitor can walk the whole shop. The shop cannot yet take a real leone payment.</h1>
+      <p>Demo: <a href="https://19781231.xyz">https://19781231.xyz</a>. Full path: <a href="https://19781231.xyz/demo">/demo</a>.</p>
+      <p>Checked at 11:37 CST on 24 Oct 2026: the home page, <a href="https://19781231.xyz/demo">/demo</a>, seller shop SEL-1001, and <code>/api/health</code> all returned HTTP 200. Health reports 260 products. That server has no backup file yet.</p>
+      <div class="stats">
+        <div class="stat"><b>90%</b>Demo completeness</div>
+        <div class="stat"><b>38%</b>Launch readiness</div>
+      </div>
+      <p class="muted">Weighted by the requirement list, live vendor hookup, tests, security, and operations. Not by lines of code. Demo about ±4 points. Launch about ±8 points.</p>
+      <h2>What already runs</h2>
+      <table>
+        <thead><tr><th>Area</th><th>State</th><th>Boundary</th></tr></thead>
+        <tbody>
+          <tr><td>Two shops, cart, checkout</td><td>In the app</td><td>Orders are stored. In-stock and sea freight can pay once and split into two orders.</td></tr>
+          <tr><td>Price, stock, states, containers</td><td>In the app</td><td>Integer leones. Stock is taken inside a transaction. Illegal status jumps are blocked.</td></tr>
+          <tr><td>Links, wallet, sellers, family, coupons, invoices, upcountry desks</td><td>In the app</td><td>Bo, Kenema, and Makeni have published inland fees. Card and mobile money are simulated.</td></tr>
+          <tr><td>1688, photo search, live room</td><td>Sample</td><td>Ports sit in lib/channels.ts. The live catalog, vision service, and stream URL are not connected.</td></tr>
+          <tr><td>Pay and refund</td><td>Internal only</td><td>Callback, idempotency, reconciliation, and wallet refunds exist. Monime keys are not connected.</td></tr>
+          <tr><td>WhatsApp and SMS</td><td>Inbox only</td><td>A failed WhatsApp falls back to a stored SMS. No BSP and no Sierra Leone gateway.</td></tr>
+          <tr><td>PWA and EN / 中文 / FR</td><td>Mostly in</td><td>The language switch works. Store buttons wait for native apps. Analytics load only after an id is saved.</td></tr>
+          <tr><td>Roles, uploads, backup command</td><td>In the source</td><td>Staff pages are role gated. Uploads check file headers. npm run backup keeps 30 days. The public server backup is empty.</td></tr>
+        </tbody>
+      </table>
+      <h2>What is still open</h2>
+      <table>
+        <thead><tr><th>Level</th><th>Issue</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td>P0</td><td>Monime, WhatsApp, SMS, 1688, and photo search have no live keys</td><td>The demo cannot collect real money or send real messages.</td></tr>
+          <tr><td>P1</td><td>reportNote and desk are public server actions</td><td>An anonymous caller can read desk counts and the report shape.</td></tr>
+          <tr><td>P1</td><td>The demo webhook secret is the default in the repository</td><td>On a public demo, anyone who knows it can forge a paid callback.</td></tr>
+          <tr><td>P1</td><td>The staff second code is not rate limited on its own, and sessions do not expire in the database</td><td>A stolen session id keeps working after the browser is closed.</td></tr>
+          <tr><td>P1</td><td>No weak-network test and no low-end Android pass</td><td>The device check in the requirements is still undone.</td></tr>
+          <tr><td>P2</td><td>No object storage and no virus scan</td><td>Seller files and payment slips are no longer public, but they still sit on the app disk.</td></tr>
+        </tbody>
+      </table>
+      <h2>How to enter the demo</h2>
+      <p class="note">Customer +232 76 111 001. The sign-in code is shown on the page. Staff ada@ledirect.demo, password Demo#2026, then the second code on the staff page. These are demo credentials.</p>
+      <h2>Use it, or write</h2>
+      <p>The project is MIT licensed. You are welcome to adapt it for your own use. If you need something, write to <a href="mailto:bigbrogbpwin@gmail.com">bigbrogbpwin@gmail.com</a>.</p>
+    </section>
+
+    <section lang="fr" hidden>
+      <p class="muted">Note d'avancement · 24 oct. 2026 · commit ed4d081</p>
+      <h1>Un visiteur peut parcourir toute la boutique. Elle ne peut pas encore encaisser de vrais leones.</h1>
+      <p>Démo : <a href="https://19781231.xyz">https://19781231.xyz</a>. Parcours : <a href="https://19781231.xyz/demo">/demo</a>.</p>
+      <p>Contrôlé le 24 oct. 2026 à 11:37 CST : l'accueil, <a href="https://19781231.xyz/demo">/demo</a>, la boutique SEL-1001 et <code>/api/health</code> répondent HTTP 200. Le contrôle indique 260 produits. Ce serveur n'a pas encore de fichier de sauvegarde.</p>
+      <div class="stats">
+        <div class="stat"><b>90 %</b>Complétude de la démo</div>
+        <div class="stat"><b>38 %</b>Préparation au lancement</div>
+      </div>
+      <p class="muted">Pondéré par le cahier des charges, les branchements tiers, les tests, la sécurité et l'exploitation. Pas par le nombre de lignes. Démo environ ±4 points. Lancement environ ±8 points.</p>
+      <h2>Ce qui tourne déjà</h2>
+      <table>
+        <thead><tr><th>Domaine</th><th>État</th><th>Limite</th></tr></thead>
+        <tbody>
+          <tr><td>Deux rayons, panier, paiement</td><td>Dans l'application</td><td>Les commandes sont enregistrées. Stock local et mer se paient ensemble et deviennent deux commandes.</td></tr>
+          <tr><td>Prix, stock, états, conteneur</td><td>Dans l'application</td><td>Leones entiers. Stock déduit dans une transaction. Saut d'état illégal bloqué.</td></tr>
+          <tr><td>Liens, portefeuille, vendeurs, famille, coupons, factures, comptoirs</td><td>Dans l'application</td><td>Bo, Kenema et Makeni ont un frais intérieur affiché. Carte et mobile money sont simulés.</td></tr>
+          <tr><td>1688, recherche photo, direct</td><td>Échantillon</td><td>Les ports sont dans lib/channels.ts. Catalogue réel, vision et flux ne sont pas branchés.</td></tr>
+          <tr><td>Paiement et remboursement</td><td>Interne seulement</td><td>Rappel, idempotence, rapprochement et remboursement vers le portefeuille existent. Pas de clés Monime.</td></tr>
+          <tr><td>WhatsApp et SMS</td><td>Boîte interne</td><td>Un WhatsApp en échec devient un SMS stocké. Pas de BSP, pas de passerelle sierra-léonaise.</td></tr>
+          <tr><td>PWA et EN / 中文 / FR</td><td>Presque en place</td><td>Le changement de langue marche. Les boutiques d'apps attendent les applications natives.</td></tr>
+          <tr><td>Rôles, fichiers, sauvegarde</td><td>Dans les sources</td><td>Les pages équipe sont limitées par rôle. npm run backup garde 30 jours. Le serveur public n'a pas encore de sauvegarde.</td></tr>
+        </tbody>
+      </table>
+      <h2>Ce qui reste ouvert</h2>
+      <table>
+        <thead><tr><th>Niveau</th><th>Point</th><th>Effet</th></tr></thead>
+        <tbody>
+          <tr><td>P0</td><td>Monime, WhatsApp, SMS, 1688 et la recherche photo n'ont pas de clés réelles</td><td>La démo ne peut ni encaisser ni envoyer de vrais messages.</td></tr>
+          <tr><td>P1</td><td>reportNote et desk sont des server actions publiques</td><td>Un appel anonyme peut lire les compteurs du bureau.</td></tr>
+          <tr><td>P1</td><td>Le secret de rappel de démo est la valeur par défaut du dépôt</td><td>Sur une démo publique, qui connaît le secret peut forger un paiement réussi.</td></tr>
+          <tr><td>P1</td><td>Le second code équipe n'a pas sa propre limite, et les sessions n'expirent pas en base</td><td>Un identifiant de session volé reste valable après la fermeture du navigateur.</td></tr>
+          <tr><td>P1</td><td>Pas de test réseau faible, pas de passage sur Android bas de gamme</td><td>Le contrôle sur appareil du cahier des charges n'est pas fait.</td></tr>
+          <tr><td>P2</td><td>Pas de stockage objet, pas d'analyse antivirus</td><td>Les pièces ne sont plus publiques, mais restent sur le disque de l'application.</td></tr>
+        </tbody>
+      </table>
+      <h2>Entrer dans la démo</h2>
+      <p class="note">Client +232 76 111 001. Le code s'affiche sur la page. Équipe : ada@ledirect.demo, mot de passe Demo#2026, puis le second code sur la page équipe. Ce sont des accès de démo.</p>
+      <h2>L'adapter, ou écrire</h2>
+      <p>Le projet est sous licence MIT. Vous pouvez le personnaliser pour votre propre usage. Pour un besoin précis : <a href="mailto:bigbrogbpwin@gmail.com">bigbrogbpwin@gmail.com</a>.</p>
+    </section>
+  </main>
+  <footer>
+    <p class="muted">Alex Hs · <a href="https://19781231.xyz">19781231.xyz</a> · <a href="mailto:bigbrogbpwin@gmail.com">bigbrogbpwin@gmail.com</a> · MIT</p>
+  </footer>
+  <script>
+    const buttons = document.querySelectorAll("nav button");
+    const sections = document.querySelectorAll("main section");
+    const html = document.documentElement;
+    function show(lang) {
+      sections.forEach((section) => {
+        section.hidden = section.lang.slice(0, 2) !== lang;
+      });
+      buttons.forEach((button) => {
+        button.setAttribute("aria-pressed", button.dataset.lang === lang ? "true" : "false");
+      });
+      html.lang = lang === "zh" ? "zh-CN" : lang;
+      try { localStorage.setItem("ledirect-note-lang", lang); } catch (e) {}
+    }
+    buttons.forEach((button) => button.addEventListener("click", () => show(button.dataset.lang)));
+    let saved = "zh";
+    try { saved = localStorage.getItem("ledirect-note-lang") || "zh"; } catch (e) {}
+    if (saved === "en" || saved === "fr" || saved === "zh") show(saved);
+  </script>
+</body>
+</html>

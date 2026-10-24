@@ -1,0 +1,17 @@
+node_modules
+.next
+data/*.sqlite
+data/*.sqlite-*
+data/uploads
+data/backups
+*.log
+*.tsbuildinfo
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# Quotes and internal specs stay out of the public repo.
+*市场报价*.pdf
+塞拉利昂直采商城产品说明书*.html
+塞拉利昂直采商城网站开发需求任务书*.html

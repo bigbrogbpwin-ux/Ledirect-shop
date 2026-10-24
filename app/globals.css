@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --sea: #0c3d38;
+  --foam: #e4eeea;
+  --paper: #f7fbfa;
+  --ink: #132421;
+  --coral: #e23e12;
+  --line: #c9d9d3;
+  --gold: #8c6a32;
+}
+
+body {
+  background: var(--foam);
+  color: var(--ink);
+  font-size: 16px;
+}
+
+a { color: inherit; }
+
+button, input, select, textarea { font: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--sea);
+  outline-offset: 2px;
+}
+
+.bill {
+  background-color: white;
+  border: 1px solid var(--line);
+  border-left: 0;
+  padding: 12px 14px 12px 22px;
+  background-image: radial-gradient(circle at 0 14px, transparent 7px, white 7.5px);
+  background-size: 14px 22px;
+  background-repeat: repeat-y;
+  box-shadow: inset 8px 0 0 var(--sea);
+}
+
+.ship {
+  position: relative;
+  height: 52px;
+  margin-top: 8px;
+}
+
+.ship .lane {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 28px;
+  height: 8px;
+  background: #b7cdc6;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.ship .lane span {
+  display: block;
+  height: 100%;
+  background: var(--sea);
+}
+
+.ship .boat {
+  position: absolute;
+  top: 0;
+  width: 46px;
+  height: 28px;
+  transform: translateX(-50%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ship .boat { transition: none; }
+}
